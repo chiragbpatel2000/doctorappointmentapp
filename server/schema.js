@@ -10,8 +10,16 @@ CREATE TABLE IF NOT EXISTS resources (
   emoji       TEXT NOT NULL,
   color       TEXT NOT NULL,
   rating      NUMERIC(2,1) NOT NULL,
-  description TEXT NOT NULL
+  description TEXT NOT NULL,
+  work_start  INTEGER NOT NULL DEFAULT 8  CHECK (work_start BETWEEN 0 AND 23),   -- first bookable hour
+  work_end    INTEGER NOT NULL DEFAULT 20 CHECK (work_end BETWEEN 1 AND 24),     -- exclusive
+  work_days   INTEGER[] NOT NULL DEFAULT '{1,2,3,4,5}'                           -- 0=Sun .. 6=Sat
 );
+-- Idempotent upgrade for databases created before working hours existed (CREATE IF NOT EXISTS
+-- does not add columns to an existing table).
+ALTER TABLE resources ADD COLUMN IF NOT EXISTS work_start INTEGER NOT NULL DEFAULT 8  CHECK (work_start BETWEEN 0 AND 23);
+ALTER TABLE resources ADD COLUMN IF NOT EXISTS work_end   INTEGER NOT NULL DEFAULT 20 CHECK (work_end BETWEEN 1 AND 24);
+ALTER TABLE resources ADD COLUMN IF NOT EXISTS work_days  INTEGER[] NOT NULL DEFAULT '{1,2,3,4,5}';
 
 -- client_id is an anonymous browser id for now; swap for a user id when auth is added.
 -- resource_name/emoji and total are snapshots so history survives catalog edits.

@@ -22,9 +22,9 @@ export async function initDb() {
   if (rows[0].n === 0) {
     for (const r of resources) {
       await pool.query(
-        `INSERT INTO resources (id,name,category,price,emoji,color,rating,description)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (id) DO NOTHING`,
-        [r.id, r.name, r.category, r.price, r.emoji, r.color, r.rating, r.description]
+        `INSERT INTO resources (id,name,category,price,emoji,color,rating,description,work_start,work_end,work_days)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (id) DO NOTHING`,
+        [r.id, r.name, r.category, r.price, r.emoji, r.color, r.rating, r.description, r.workStart, r.workEnd, r.workDays]
       );
     }
     console.log(`Seeded ${resources.length} resources`);

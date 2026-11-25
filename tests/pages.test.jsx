@@ -44,6 +44,16 @@ describe('ResourceDetail', () => {
     expect(await screen.findByText(/Could not load: Server exploded/)).toBeInTheDocument();
   });
 
+  it('shows working hours and a message on days the doctor is off', async () => {
+    await renderApp('/resource/2');
+    expect(await screen.findByText('Works Mon, 09:00–15:00')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2030-01-01' } }); // a Tuesday
+    expect(await screen.findByText(/Not available this day/)).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Time slots' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2030-01-07' } }); // a Monday
+    expect(await screen.findByRole('group', { name: 'Time slots' })).toBeInTheDocument();
+  });
+
   it('books the selected slot and lands on My appointments', async () => {
     const { user } = await renderApp('/resource/1');
     await screen.findByRole('group', { name: 'Time slots' });

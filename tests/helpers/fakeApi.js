@@ -1,9 +1,9 @@
 import { vi } from 'vitest';
 
 export const RESOURCES = [
-  { id: 1, name: 'Dr. Priya Sharma', category: 'General Practice', price: 40, emoji: '🩺', color: '#dcfce7', rating: 4.8, description: 'Family doctor.' },
-  { id: 2, name: 'Dr. Aisha Khan', category: 'Cardiology', price: 35, emoji: '❤️', color: '#fed7aa', rating: 4.6, description: 'Heart health.' },
-  { id: 3, name: 'Dr. Mei Tan', category: 'Paediatrics', price: 45, emoji: '🧸', color: '#dbeafe', rating: 4.7, description: 'Child care.' },
+  { id: 1, name: 'Dr. Priya Sharma', category: 'General Practice', price: 40, emoji: '🩺', color: '#dcfce7', rating: 4.8, description: 'Family doctor.', workStart: 8, workEnd: 16, workDays: [0, 1, 2, 3, 4, 5, 6] },
+  { id: 2, name: 'Dr. Aisha Khan', category: 'Cardiology', price: 35, emoji: '❤️', color: '#fed7aa', rating: 4.6, description: 'Heart health.', workStart: 9, workEnd: 15, workDays: [1] },
+  { id: 3, name: 'Dr. Mei Tan', category: 'Paediatrics', price: 45, emoji: '🧸', color: '#dbeafe', rating: 4.7, description: 'Child care.', workStart: 8, workEnd: 14, workDays: [0, 1, 2, 3, 4, 5, 6] },
 ];
 export const HOURS = [8, 9, 10, 11];
 
@@ -28,7 +28,7 @@ function handle(state, path, { method = 'GET', body } = {}) {
     const day = decodeURIComponent(m[2]);
     return {
       day, price: r.price,
-      slots: HOURS.map((hour) => ({ hour, booked: state.taken.some((t) => t.resourceId === r.id && t.day === day && t.hour === hour) })),
+      slots: (r.workDays.includes(new Date(`${day}T00:00:00Z`).getUTCDay()) ? HOURS : []).map((hour) => ({ hour, booked: state.taken.some((t) => t.resourceId === r.id && t.day === day && t.hour === hour) })),
     };
   }
   if ((m = path.match(/^\/resources\/([^/]+)$/)) && method === 'GET') {

@@ -14,9 +14,12 @@ vi.mock('../../server/db.js', async () => {
   await db.exec(schema);
   for (const r of resources)
     await db.query(
-      'INSERT INTO resources (id,name,category,price,emoji,color,rating,description) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-      [r.id, r.name, r.category, r.price, r.emoji, r.color, r.rating, r.description]
+      'INSERT INTO resources (id,name,category,price,emoji,color,rating,description,work_start,work_end,work_days) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+      [r.id, r.name, r.category, r.price, r.emoji, r.color, r.rating, r.description, r.workStart, r.workEnd, r.workDays]
     );
+  // Doctors 1 and 2 work every day (08:00-16:00 / 12:00-20:00) so tests may use any future date;
+  // working-day rules are tested on doctor 3 (Mon/Wed/Fri 09:00-15:00).
+  await db.query("UPDATE resources SET work_days = '{0,1,2,3,4,5,6}' WHERE id IN (1, 2)");
   const control = { failOn: null };
   const run = async (text, params) => {
     if (control.failOn?.test(text)) throw new Error('simulated db failure');
@@ -44,6 +47,14 @@ const customer = { name: 'Ann Lee', email: 'ann@example.com' };
 // A date safely in the future, built from UTC parts so it never depends on the machine timezone.
 const future = (days = 30) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 const book = (c, over = {}) => c.post('/api/bookings', { resourceId: 1, day: future(), hours: [9], customer, ...over });
+
+// First date >= `from` days ahead that falls on weekday `dow` (0=Sun .. 6=Sat), as YYYY-MM-DD.
+const onWeekday = (dow, from = 60) => {
+  for (let i = from; ; i++) {
+    const d = future(i);
+    if (new Date(`${d}T00:00:00Z`).getUTCDay() === dow) return d;
+  }
+};
 
 afterEach(() => { control.failOn = null; });
 vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -82,7 +93,7 @@ describe('resources', () => {
     const day = future(31);
     let res = await request(app).get(`/api/resources/1/availability?day=${day}`);
     expect(res.body.day).toBe(day);
-    expect(res.body.slots.map((s) => s.hour)).toEqual(SLOT_HOURS);
+    expect(res.body.slots.map((s) => s.hour)).toEqual(SLOT_HOURS.filter((h) => h < 16)); // doctor 1: 08:00-16:00
     expect(res.body.slots.every((s) => !s.booked)).toBe(true);
 
     await book(c, { day, hours: [10] });
@@ -141,7 +152,7 @@ describe('bookings', () => {
     const day = future(43);
     await book(c, { day, hours: [9] });
     expect((await book(c, { day: future(44), hours: [9] })).status).toBe(201);
-    expect((await book(c, { day, hours: [9], resourceId: 2 })).status).toBe(201);
+    expect((await book(c, { day, hours: [12], resourceId: 2 })).status).toBe(201);
   });
 
   it.each([
@@ -208,5 +219,35 @@ describe('errors', () => {
     const res = await request(app).post('/api/bookings').set('X-Client-Id', newClient()).set('Content-Type', 'application/json').send('{bad');
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid JSON');
+  });
+});
+
+describe('working hours', () => {
+  // Doctor 3: Mon/Wed/Fri, 09:00-15:00 (last bookable start 14:00).
+  const doc3 = (over = {}) => book(as(newClient()), { resourceId: 3, ...over });
+
+  it('exposes working hours on the doctor', async () => {
+    expect((await request(app).get('/api/resources/3')).body).toMatchObject({ workStart: 9, workEnd: 15, workDays: [1, 3, 5] });
+  });
+
+  it('offers only the working hours on a working day and nothing on a day off', async () => {
+    const mon = (await request(app).get(`/api/resources/3/availability?day=${onWeekday(1)}`)).body;
+    expect(mon.slots.map((x) => x.hour)).toEqual([9, 10, 11, 12, 13, 14]);
+    const tue = (await request(app).get(`/api/resources/3/availability?day=${onWeekday(2)}`)).body;
+    expect(tue.slots).toEqual([]);
+  });
+
+  it('books inside working hours, including the last slot', async () => {
+    expect((await doc3({ day: onWeekday(1, 61), hours: [14] })).status).toBe(201);
+  });
+
+  it.each([
+    ['before opening', 1, 8],
+    ['at closing time', 1, 15],
+    ['on a day off', 2, 10],
+  ])('rejects a booking %s', async (_label, dow, hour) => {
+    const res = await doc3({ day: onWeekday(dow, 68), hours: [hour] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('The doctor is not available at that time');
   });
 });

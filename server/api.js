@@ -6,11 +6,19 @@ export const api = express.Router();
 api.use(express.json());
 
 const RESOURCE_COLS = `r.id, r.name, r.category, r.price::float8 AS price, r.emoji, r.color,
-                       r.rating::float8 AS rating, r.description`;
+                       r.rating::float8 AS rating, r.description,
+                       r.work_start AS "workStart", r.work_end AS "workEnd", r.work_days AS "workDays"`;
 
-// Bookable start hours (08:00 .. 19:00). The client never hardcodes these: it reads them from
-// /resources/:id/availability, so this is the single source of truth. Make per-resource if needed.
+// Outer bounds of bookable start hours (08:00 .. 19:00). Each doctor narrows this with
+// work_start/work_end/work_days. The client never hardcodes hours: it reads them from
+// /resources/:id/availability, so the server is the single source of truth.
 export const SLOT_HOURS = Array.from({ length: 12 }, (_, i) => i + 8);
+
+// Hours a doctor can be booked on a given YYYY-MM-DD day ([] when they don't work that weekday).
+const slotsFor = (r, day) => {
+  const dow = new Date(`${day}T00:00:00Z`).getUTCDay();
+  return r.work_days.includes(dow) ? SLOT_HOURS.filter((h) => h >= r.work_start && h < r.work_end) : [];
+};
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -68,11 +76,11 @@ api.get('/resources/:id', h(async (req, res) => {
 api.get('/resources/:id/availability', h(async (req, res) => {
   const id = parseId(req.params.id);
   const day = parseDay(req.query.day);
-  const { rows: found } = await query('SELECT price::float8 AS price FROM resources WHERE id = $1', [id]);
+  const { rows: found } = await query('SELECT price::float8 AS price, work_start, work_end, work_days FROM resources WHERE id = $1', [id]);
   if (!found[0]) throw new HttpError(404, 'Resource not found');
   const { rows } = await query('SELECT hour FROM booking_slots WHERE resource_id = $1 AND day = $2', [id, day]);
   const taken = new Set(rows.map((r) => r.hour));
-  res.json({ day, price: found[0].price, slots: SLOT_HOURS.map((hour) => ({ hour, booked: taken.has(hour) })) });
+  res.json({ day, price: found[0].price, slots: slotsFor(found[0], day).map((hour) => ({ hour, booked: taken.has(hour) })) });
 }));
 
 /* ---------- bookings ---------- */
@@ -124,9 +132,10 @@ api.post('/bookings', needClient, h(async (req, res) => {
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
-    const { rows } = await db.query('SELECT id, name, emoji, price::float8 AS price FROM resources WHERE id = $1', [resourceId]);
+    const { rows } = await db.query('SELECT id, name, emoji, price::float8 AS price, work_start, work_end, work_days FROM resources WHERE id = $1', [resourceId]);
     const resource = rows[0];
     if (!resource) throw new HttpError(404, 'Resource not found');
+    if (!slotsFor(resource, day).includes(sorted[0])) throw new HttpError(400, 'The doctor is not available at that time');
 
     const total = round2(resource.price * sorted.length); // price is always recomputed server-side
     const id = 'BKG-' + randomBytes(4).toString('hex').toUpperCase();

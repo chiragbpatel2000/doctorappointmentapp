@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { fetchAvailability, fetchResource } from '../api/resources';
 import { useStore } from '../context/StoreContext';
-import { formatHour, money, toDay } from '../utils/format';
+import { formatDays, formatHour, money, toDay } from '../utils/format';
 
 export default function ResourceDetail() {
   const { id } = useParams();
@@ -75,6 +75,7 @@ export default function ResourceDetail() {
         <h1>{resource.name}</h1>
         <div className="meta"><span>{resource.category}</span><span className="rating">★ {resource.rating.toFixed(1)}</span></div>
         <p>{resource.description}</p>
+        <p><small>Works {formatDays(resource.workDays)}, {formatHour(resource.workStart)}–{formatHour(resource.workEnd)}</small></p>
         <div className="price">{money(resource.price)} <small>/ visit</small></div>
 
         <label>Date
@@ -84,7 +85,8 @@ export default function ResourceDetail() {
         <h3>Available times</h3>
         {slotsError && <p className="err">{slotsError}</p>}
         {!slots && !slotsError &&<p className="empty">Loading times…</p>}
-        {slots && (
+        {slots && slots.length === 0 && <p className="empty">Not available this day. Try another date.</p>}
+        {slots && slots.length > 0 && (
           <div className="chips" role="group" aria-label="Time slots">
             {slots.map((s) => (
               <button
