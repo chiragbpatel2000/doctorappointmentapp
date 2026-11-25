@@ -43,6 +43,7 @@ function handle(state, path, { method = 'GET', body } = {}) {
   if (key === 'POST /bookings') {
     const r = state.resources.find((x) => x.id === body.resourceId);
     if (!r) throw new Error('Resource not found');
+    if (!Array.isArray(body.hours) || body.hours.length !== 1) throw new Error('Choose one valid time slot');
     if (body.hours.some((hour) => state.taken.some((t) => t.resourceId === r.id && t.day === body.day && t.hour === hour)))
       throw new Error('Sorry, one of those slots was just booked. Pick another time.');
     body.hours.forEach((hour) => state.taken.push({ resourceId: r.id, day: body.day, hour }));

@@ -108,9 +108,9 @@ api.post('/bookings', needClient, h(async (req, res) => {
   assertNotPast(day);
 
   const hours = req.body?.hours;
-  if (!Array.isArray(hours) || hours.length === 0 || hours.length > SLOT_HOURS.length ||
-      new Set(hours).size !== hours.length || !hours.every((x) => SLOT_HOURS.includes(x)))
-    throw new HttpError(400, 'Choose at least one valid time slot');
+  // An appointment is exactly one slot. The payload keeps the `hours` array shape for compatibility.
+  if (!Array.isArray(hours) || hours.length !== 1 || !SLOT_HOURS.includes(hours[0]))
+    throw new HttpError(400, 'Choose one valid time slot');
 
   const customer = {};
   for (const f of CUSTOMER_FIELDS) {

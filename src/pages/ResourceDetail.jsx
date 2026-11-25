@@ -43,7 +43,7 @@ export default function ResourceDetail() {
   if (resource === undefined) return <p className="empty">Loading…</p>;
   if (resource === null) return <p className="empty">Not found. <Link to="/">Back to doctors</Link></p>;
 
-  const toggle = (h) => setPicked((p) => (p.includes(h) ? p.filter((x) => x !== h) : [...p, h]));
+  const toggle = (h) => setPicked((p) => (p.includes(h) ? [] : [h])); // one slot per appointment
   const total = resource.price * picked.length;
 
   const submit = async (e) => {

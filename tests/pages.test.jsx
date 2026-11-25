@@ -44,18 +44,18 @@ describe('ResourceDetail', () => {
     expect(await screen.findByText(/Could not load: Server exploded/)).toBeInTheDocument();
   });
 
-  it('books selected slots and lands on My appointments', async () => {
+  it('books the selected slot and lands on My appointments', async () => {
     const { user } = await renderApp('/resource/1');
     await screen.findByRole('group', { name: 'Time slots' });
     await user.click(screen.getByRole('button', { name: '09:00' }));
     await user.click(screen.getByRole('button', { name: '10:00' }));
-    expect(screen.getByText('$80.00', { selector: '.total span' })).toBeInTheDocument();
+    expect(screen.getByText('$40.00', { selector: '.total span' })).toBeInTheDocument(); // picking another time replaces the first
     await user.type(screen.getByLabelText('Your name'), 'Ann Lee');
     await user.type(screen.getByLabelText('Email'), 'ann@example.com');
     await user.click(screen.getByRole('button', { name: 'Confirm appointment' }));
 
     expect(await screen.findByText(/Appointment BKG-TEST1 confirmed/)).toBeInTheDocument();
-    expect(fake.state.bookings[0]).toMatchObject({ hours: [9, 10], total: 80, day: toDay() });
+    expect(fake.state.bookings[0]).toMatchObject({ hours: [10], total: 40, day: toDay() });
   });
 
   it('validates the form before calling the API', async () => {

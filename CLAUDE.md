@@ -8,6 +8,7 @@ React 19 + Vite SPA served by one Express process; Neon Postgres via `pg`; Vites
 
 ## Domain model
 - "resource" = a doctor (`category` = specialty, `price` = fee per 1-hour slot). Table/route names kept generic (`resources`, `bookings`) on purpose; UI copy says doctor/appointment.
+- An appointment is exactly one slot (`hours` array of length 1, enforced in `POST /bookings`; the UI is single-select). Existing multi-hour rows, if any, still display.
 - Slots are hourly, 08:00–19:00, defined by `SLOT_HOURS` in `server/api.js` and served via the availability endpoint (the client never hardcodes them).
 - Double-booking is prevented by `PRIMARY KEY (resource_id, day, hour)` on `booking_slots`; API maps 23505 to 409.
 - Identity is an anonymous `X-Client-Id` (localStorage UUID). Demo-grade: real patient data needs auth and HIPAA/GDPR review.
@@ -22,4 +23,4 @@ React 19 + Vite SPA served by one Express process; Neon Postgres via `pg`; Vites
 Frontend tests mock `src/api/client.js` with the fake API. Server tests run real SQL on PGlite (single connection: real concurrency races are not testable there).
 
 ## Known gaps
-- An appointment can still span several consecutive hours (template behaviour); per-doctor working hours and 30-minute slots are not implemented.
+- Per-doctor working hours and 30-minute slots are not implemented.

@@ -85,9 +85,9 @@ describe('resources', () => {
     expect(res.body.slots.map((s) => s.hour)).toEqual(SLOT_HOURS);
     expect(res.body.slots.every((s) => !s.booked)).toBe(true);
 
-    await book(c, { day, hours: [10, 11] });
+    await book(c, { day, hours: [10] });
     res = await request(app).get(`/api/resources/1/availability?day=${day}`);
-    expect(res.body.slots.filter((s) => s.booked).map((s) => s.hour)).toEqual([10, 11]);
+    expect(res.body.slots.filter((s) => s.booked).map((s) => s.hour)).toEqual([10]);
   });
 
   it('validates availability input', async () => {
@@ -106,16 +106,16 @@ describe('bookings', () => {
   it('creates a booking with a server-computed total and a YYYY-MM-DD day', async () => {
     const c = as(newClient());
     const day = future(40);
-    const res = await book(c, { day, hours: [11, 9] });
+    const res = await book(c, { day, hours: [11] });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
-      resource: { id: 1, name: 'Dr. Priya Sharma' }, day, hours: [9, 11], total: 120, status: 'confirmed',
+      resource: { id: 1, name: 'Dr. Priya Sharma' }, day, hours: [11], total: 60, status: 'confirmed',
     });
     expect(res.body.id).toMatch(/^BKG-[0-9A-F]{8}$/);
 
     const list = (await c.get('/api/bookings')).body;
     expect(list).toHaveLength(1);
-    expect(list[0]).toMatchObject({ id: res.body.id, day, hours: [9, 11], total: 120 });
+    expect(list[0]).toMatchObject({ id: res.body.id, day, hours: [11], total: 60 });
   });
 
   it('scopes bookings to the client', async () => {
@@ -126,9 +126,9 @@ describe('bookings', () => {
 
   it('409s when a slot is already taken and leaves nothing behind (rollback)', async () => {
     const day = future(42);
-    expect((await book(as(newClient()), { day, hours: [9, 10] })).status).toBe(201);
+    expect((await book(as(newClient()), { day, hours: [9] })).status).toBe(201);
     const other = as(newClient());
-    const res = await book(other, { day, hours: [8, 10] }); // 8 is free, 10 is taken
+    const res = await book(other, { day, hours: [9] }); // already taken
     expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/just booked/);
     expect((await other.get('/api/bookings')).body).toEqual([]);
@@ -151,6 +151,7 @@ describe('bookings', () => {
     ['hours not an array', { hours: 9 }, 400],
     ['hour outside opening times', { hours: [3] }, 400],
     ['duplicate hours', { hours: [9, 9] }, 400],
+    ['more than one slot', { hours: [9, 10] }, 400],
     ['bad day', { day: 'tomorrow' }, 400],
     ['day in the past', { day: '2020-01-01' }, 400],
     ['missing name', { customer: { email: 'a@b.co' } }, 400],
